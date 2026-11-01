@@ -1,0 +1,148 @@
+<Window x:Class="RPGMDataSearch.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="RPGM Data Search" MinWidth="900" MinHeight="480" Closing="Window_Closing">
+    <Window.Resources>
+        <Style TargetType="CheckBox">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="12,3" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+        </Style>
+        <!-- the header of a column: its name and the button of the filter of the column -->
+        <DataTemplate x:Key="FilterHeader">
+            <DockPanel LastChildFill="True">
+                <Button DockPanel.Dock="Right" Content="▾" Tag="{Binding}" Click="FilterButton_Click" Padding="3,0" Margin="6,0,0,0"
+                        Background="Transparent" BorderThickness="0" Focusable="False" FontSize="11" Cursor="Hand" ToolTip="Filter the column" />
+                <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+            </DockPanel>
+        </DataTemplate>
+        <DataTemplate x:Key="FilterItem">
+            <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}" Margin="0,1" Content="{Binding Text}" />
+        </DataTemplate>
+        <Style TargetType="TextBlock" x:Key="Caption">
+            <Setter Property="Foreground" Value="Gray" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+        </Style>
+    </Window.Resources>
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- the project -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,8">
+            <TextBlock DockPanel.Dock="Left" Text="Project" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <Button DockPanel.Dock="Right" x:Name="OpenButton" Content="Open" Margin="6,0,0,0" Click="Open_Click" />
+            <Button DockPanel.Dock="Right" x:Name="BrowseButton" Content="Browse..." Margin="6,0,0,0" Click="Browse_Click" />
+            <TextBlock DockPanel.Dock="Right" x:Name="VersionText" VerticalAlignment="Center" Foreground="Gray" Margin="8,0,0,0" />
+            <ComboBox x:Name="ProjectBox" IsEditable="True" VerticalContentAlignment="Center" Padding="2" PreviewKeyDown="ProjectBox_KeyDown"
+                      SelectionChanged="ProjectBox_SelectionChanged"
+                      ToolTip="The folder of an MV project (the one with data, or the one with www) or of a VX Ace project (the one with Data); the list has the projects that were opened" />
+        </DockPanel>
+
+        <!-- the search -->
+        <GroupBox Grid.Row="1" Header="Search" Padding="6" Margin="0,0,0,8">
+            <StackPanel>
+                <TabControl x:Name="KindTabs" Margin="0,0,0,8" />
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                        <Button x:Name="SearchButton" Content="Search" FontWeight="SemiBold" Click="Search_Click" />
+                        <Button x:Name="CancelButton" Content="Cancel" IsEnabled="False" Click="Cancel_Click" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <TextBlock Text="Look in" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="Gray" />
+                        <CheckBox x:Name="CeCheck" Content="Common events" />
+                        <CheckBox x:Name="MapCheck" Content="Map events" />
+                        <CheckBox x:Name="TroopCheck" Content="Troops" Margin="0" />
+                    </StackPanel>
+                </DockPanel>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- the filter of the result -->
+        <DockPanel Grid.Row="2" Margin="0,0,0,4">
+            <TextBlock DockPanel.Dock="Right" x:Name="CountText" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="Gray" />
+            <Button DockPanel.Dock="Right" x:Name="ClearFiltersButton" Content="Clear all filters" Margin="8,0,0,0" Click="ClearFilters_Click" IsEnabled="False"
+                    ToolTip="Clears the filter of the result and the filters of the columns" />
+            <TextBlock DockPanel.Dock="Left" Text="Filter the result" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <TextBox x:Name="FilterBox" Padding="2" TextChanged="FilterBox_TextChanged"
+                     ToolTip="The rows that have all the words (in any column)" />
+        </DockPanel>
+
+        <!-- the result -->
+        <DataGrid Grid.Row="3" x:Name="ResultsGrid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single"
+                  CanUserAddRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal" AlternatingRowBackground="#10808080"
+                  MouseDoubleClick="ResultsGrid_MouseDoubleClick" SelectionChanged="ResultsGrid_SelectionChanged">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Source" HeaderTemplate="{StaticResource FilterHeader}" Binding="{Binding Source}" Width="60" />
+                <DataGridTextColumn Header="Location" HeaderTemplate="{StaticResource FilterHeader}" Binding="{Binding Location}" Width="330" />
+                <DataGridTextColumn Header="Trigger" HeaderTemplate="{StaticResource FilterHeader}" Binding="{Binding Trigger}" Width="90" />
+                <DataGridTextColumn Header="Page conditions" HeaderTemplate="{StaticResource FilterHeader}" Binding="{Binding Conditions}" Width="130" />
+                <DataGridTextColumn Header="Line" HeaderTemplate="{StaticResource FilterHeader}" Binding="{Binding Line}" Width="45" />
+                <DataGridTextColumn Header="Command" HeaderTemplate="{StaticResource FilterHeader}" Binding="{Binding Command}" Width="130" />
+                <DataGridTextColumn Header="Details" HeaderTemplate="{StaticResource FilterHeader}" Binding="{Binding Details}" Width="320" />
+                <DataGridTextColumn Header="Matched" HeaderTemplate="{StaticResource FilterHeader}" Binding="{Binding Matched}" Width="190" />
+                <DataGridTextColumn Header="Access" HeaderTemplate="{StaticResource FilterHeader}" Binding="{Binding Access}" Width="55" />
+                <DataGridTextColumn Header="Hits on page" HeaderTemplate="{StaticResource FilterHeader}" Binding="{Binding HitsOnPage}" Width="80" />
+            </DataGrid.Columns>
+            <DataGrid.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Open the page dump" Click="OpenPage_Click" />
+                    <MenuItem Header="Open dumps of all pages of the event" Click="OpenEvent_Click" />
+                    <Separator />
+                    <MenuItem Header="Copy the location" Click="CopyLocation_Click" />
+                    <MenuItem Header="Copy the details" Click="CopyDetails_Click" />
+                </ContextMenu>
+            </DataGrid.ContextMenu>
+        </DataGrid>
+
+        <!-- the filter of a column: the values with the check boxes, as in a table processor -->
+        <Popup x:Name="FilterPopup" StaysOpen="False" Placement="Bottom" Closed="FilterPopup_Closed">
+            <Border Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}" BorderBrush="Gray" BorderThickness="1" Padding="8">
+                <StackPanel Width="320">
+                    <TextBlock x:Name="FilterTitle" FontWeight="SemiBold" Margin="0,0,0,4" />
+                    <TextBox x:Name="FilterSearchBox" Padding="2" TextChanged="FilterSearchBox_TextChanged" ToolTip="Search in the values" />
+                    <CheckBox x:Name="FilterAllBox" Margin="0,6,0,2" IsThreeState="True" Click="FilterAllBox_Click" />
+                    <ListBox x:Name="FilterList" Height="260" ItemTemplate="{StaticResource FilterItem}" HorizontalContentAlignment="Stretch"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+                    <TextBlock x:Name="FilterNote" Foreground="Gray" Margin="0,2,0,0" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Button Content="OK" Width="70" Click="FilterOk_Click" />
+                        <Button Content="Clear column" Click="FilterClear_Click" />
+                        <Button Content="Cancel" Width="70" Margin="0" Click="FilterCancel_Click" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Popup>
+
+        <!-- the dump -->
+        <DockPanel Grid.Row="4" Margin="0,8,0,0">
+            <Button DockPanel.Dock="Right" x:Name="OpenAllButton" Content="Open dumps of all results" Margin="6,0,0,0" Click="OpenAll_Click" IsEnabled="False"
+                    ToolTip="One dump for each page of the rows that are shown (the filter of the result counts)" />
+            <Button DockPanel.Dock="Right" x:Name="OpenEventButton" Content="Open dumps of all pages of the event" Margin="6,0,0,0" Click="OpenEvent_Click" IsEnabled="False" />
+            <Button DockPanel.Dock="Right" x:Name="OpenPageButton" Content="Open the page dump" Margin="6,0,0,0" Click="OpenPage_Click" IsEnabled="False" />
+            <CheckBox DockPanel.Dock="Left" x:Name="ExpandCheck" Content="Expand common events" Margin="0,0,10,0" />
+            <CheckBox DockPanel.Dock="Left" x:Name="ExtendedCheck" Content="Extended format" Margin="0,0,10,0" />
+            <TextBlock DockPanel.Dock="Left" Text="Dump to" VerticalAlignment="Center" Margin="0,0,6,0" />
+            <Button DockPanel.Dock="Right" Content="..." Padding="8,0" Margin="6,0,0,0" Click="DumpBrowse_Click" />
+            <TextBox x:Name="DumpFolderBox" Padding="2" />
+        </DockPanel>
+
+        <StatusBar Grid.Row="5" Margin="0,6,0,0">
+            <StatusBarItem DockPanel.Dock="Right">
+                <ProgressBar x:Name="Progress" Width="140" Height="12" IsIndeterminate="False" Visibility="Hidden" />
+            </StatusBarItem>
+            <StatusBarItem>
+                <TextBlock x:Name="StatusText" Text="Open a project." />
+            </StatusBarItem>
+        </StatusBar>
+    </Grid>
+</Window>

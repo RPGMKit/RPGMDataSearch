@@ -1,0 +1,3 @@
+[submodule "external/RPGMDataKit"]
+	path = external/RPGMDataKit
+	url = git@github.com:RPGMKit/RPGMDataKit.git
