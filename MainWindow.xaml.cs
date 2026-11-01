@@ -19,6 +19,7 @@ public partial class MainWindow : Window
         Ids,
         Letters,
         Text,
+        Script,
     }
 
     // the tabs of the search: what is found, the title and the controls the tab has
@@ -35,6 +36,7 @@ public partial class MainWindow : Window
         (SearchKind.Actors, "Actors", Shape.Ids, true),
         (SearchKind.TransferMap, "Transfer map", Shape.Ids, false),
         (SearchKind.CommandText, "Command text", Shape.Text, false),
+        (SearchKind.Script, "Script", Shape.Script, false),
     ];
 
     /// <summary>The controls of one tab (the ones it does not need are null).</summary>
@@ -251,7 +253,25 @@ public partial class MainWindow : Window
         {
             var query = new QueryTab { Kind = kind };
             var panel = new WrapPanel { Margin = new Thickness(8, 8, 8, 2) };
-            if (shape == Shape.Text)
+            if (shape == Shape.Script)
+            {
+                var editor = new ScriptEditor();
+                editor.SearchRequested += () =>
+                {
+                    if (!_busy)
+                        Search_Click(editor.Box, new RoutedEventArgs());
+                };
+                query.Pattern = editor.Box;
+                var field = Labeled("Expression: true for the commands to find", editor.Box);
+                field.Children.Add(new TextBlock
+                {
+                    Foreground = System.Windows.Media.Brushes.Gray, Margin = new Thickness(0, 4, 0, 0), MaxWidth = 820, TextWrapping = TextWrapping.Wrap,
+                    Text = "Names: command (or c, NamedCommand), line, source (\"CE\", \"Map\", \"Troop\"), location. A type is checked with is: command is ShowPictureCommand p && p.Picture.StartsWith(\"great\"). "
+                           + "A dot shows the members, Ctrl+Space the names, Ctrl+Enter searches. Empty finds every command.",
+                });
+                panel.Children.Add(field);
+            }
+            else if (shape == Shape.Text)
             {
                 query.Pattern = new TextBox { Width = 380, Padding = new Thickness(2), ToolTip = kind == SearchKind.Pictures ? "The name of the picture; empty is any" : "The text of the command (its name and parameters); empty is any" };
                 query.Regex = new CheckBox { Content = "Regular expression", ToolTip = "Off: the text is searched as it is" };
@@ -286,7 +306,8 @@ public partial class MainWindow : Window
 
             foreach (var box in new[] { query.Ids, query.Pattern })
             {
-                if (box != null)
+                // (Enter is a new line in the script)
+                if (box != null && kind != SearchKind.Script)
                     box.KeyDown += Query_KeyDown;
             }
 
@@ -313,7 +334,7 @@ public partial class MainWindow : Window
     {
         var query = Current;
         Regex? pattern = null;
-        if (query.Pattern is { Text.Length: > 0 })
+        if (query.Kind != SearchKind.Script && query.Pattern is { Text.Length: > 0 })
         {
             var options = query.IgnoreCase?.IsChecked == true ? RegexOptions.IgnoreCase | RegexOptions.CultureInvariant : RegexOptions.CultureInvariant;
             var text = query.Regex?.IsChecked == true ? query.Pattern.Text : Regex.Escape(query.Pattern.Text);
@@ -325,6 +346,7 @@ public partial class MainWindow : Window
             Kind = query.Kind,
             Ids = query.Ids == null ? IdFilter.Empty : IdFilter.Parse(query.Ids.Text, query.Kind == SearchKind.SelfSwitches),
             Pattern = pattern,
+            ScriptText = query.Kind == SearchKind.Script ? query.Pattern?.Text ?? "" : "",
             Access = Enum.Parse<AccessFilter>(query.Access?.SelectedItem?.ToString() ?? nameof(AccessFilter.Both)),
             InCommonEvents = CeCheck.IsChecked == true,
             InMapEvents = MapCheck.IsChecked == true,
@@ -365,7 +387,8 @@ public partial class MainWindow : Window
         try
         {
             var progress = new Progress<string>(SetStatus);
-            var hits = await Task.Run(() => new SearchEngine(storage, request).Run(progress, token), token);
+            var engine = new SearchEngine(storage, request);
+            var hits = await Task.Run(() => engine.Run(progress, token), token);
             _columnFilters.Clear();   // the values of the new result are others
             _hits.Clear();
             foreach (var hit in hits)
@@ -375,6 +398,16 @@ public partial class MainWindow : Window
             SetStatus($"{hits.Count} hits on {hits.Select(hit => hit.Page.Key).Distinct().Count()} pages, {(DateTime.Now - started).TotalSeconds:0.0} s.");
             CollectSettings();
             _settings.Save();
+            if (engine.ScriptErrors > 0)
+            {
+                SetStatus($"{hits.Count} hits; the script threw for {engine.ScriptErrors} commands.");
+                MessageBox.Show(this, $"The script threw an exception for {engine.ScriptErrors} commands (they are not in the result). The first:{Environment.NewLine}{engine.FirstScriptError}", "Script", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+        catch (ScriptCompileException ex)
+        {
+            SetStatus("The script has errors.");
+            MessageBox.Show(this, ex.Message, "Script", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         catch (OperationCanceledException)
         {

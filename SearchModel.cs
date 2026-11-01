@@ -13,6 +13,7 @@ public enum SearchKind
     Actors,
     TransferMap,
     CommandText,
+    Script,
 }
 
 public enum AccessFilter
@@ -41,6 +42,9 @@ public sealed class SearchRequest
     public IdFilter Ids { get; init; } = IdFilter.Empty;
     public System.Text.RegularExpressions.Regex? Pattern { get; init; }
     public AccessFilter Access { get; init; }
+
+    /// <summary>The expression of the tab "Script" (true: the command is found).</summary>
+    public string ScriptText { get; init; } = "";
     public bool InCommonEvents { get; init; } = true;
     public bool InMapEvents { get; init; } = true;
     public bool InTroops { get; init; } = true;

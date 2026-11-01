@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis.Scripting;
 using RPGMDataKit;
 using RPGMDataKit.Data.Enums;
 using RPGMDataKit.Data.Structures.Commands;
@@ -26,8 +27,23 @@ internal sealed class SearchEngine
         _context = new EntityContext(storage, extendedFormat: true);
     }
 
+    // the script of the tab "Script": compiled once, run for each command (a command that makes it throw is not found; the first error is told)
+    private ScriptRunner<bool>? _script;
+    private readonly ScriptGlobals _globals = new();
+
+    /// <summary>How many commands made the script throw, and the first of the errors.</summary>
+    public int ScriptErrors { get; private set; }
+
+    public string? FirstScriptError { get; private set; }
+
     public List<SearchHit> Run(IProgress<string> progress, CancellationToken token)
     {
+        if (_request.Kind == SearchKind.Script)
+        {
+            progress.Report("Compiling the script...");
+            _script = ScriptCompiler.Compile(_request.ScriptText);
+        }
+
         var hits = new List<SearchHit>();
         if (_request.InCommonEvents)
         {
@@ -113,6 +129,14 @@ internal sealed class SearchEngine
         for (var i = 0; i < commands.Count; i++)
         {
             var command = commands[i];
+            if (_request.Kind == SearchKind.Script)
+            {
+                if (RunScript(command, i, source, where))
+                    hits.Add(NewHit(page, source, where, trigger, conditions, i, command, "script", ""));
+
+                continue;
+            }
+
             if (_request.Kind == SearchKind.CommandText)
             {
                 var text = command.GetCommandName(_storage.Version) + " " + Describe(command);
@@ -127,6 +151,24 @@ internal sealed class SearchEngine
                 if (IsWanted(reference))
                     hits.Add(NewHit(page, source, where, trigger, conditions, i, command, Name(reference), reference.Kind is SearchKind.CommonEventCalls or SearchKind.Pictures or SearchKind.TransferMap ? "" : reference.IsSet ? "Set" : "Check"));
             }
+        }
+    }
+
+    private bool RunScript(NamedCommand command, int line, string source, string where)
+    {
+        _globals.command = command;
+        _globals.line = line;
+        _globals.source = source;
+        _globals.location = where;
+        try
+        {
+            return _script!(_globals).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            ScriptErrors++;
+            FirstScriptError ??= $"{ex.GetType().Name}: {ex.Message} (in {where}, line {line}, {command.GetType().Name})";
+            return false;
         }
     }
 

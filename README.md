@@ -39,12 +39,39 @@ Each kind of search has its own tab with only the fields it needs.
 | Actors | `Change Party Member` (set), `If Actor` (check), `Control Variables` that reads a parameter of an actor (check), the actor condition of a page | ids, name, set / check |
 | Transfer map | `Transfer Player` to the given maps | ids, name |
 | Command text | the name and the description of any command, as the dump writes them | text, regular expression, ignore case |
+| Script | the commands for which a C# expression is true (see below) | the expression |
 
 - **Ids** are `1, 5-10, 40`. For a range of switches or variables in a command, any id of the range is enough. An empty field is any.
 - **Name** is a part of the name as the editor shows it (of the common event, switch, variable, item, map, ...), or a regular expression with the options next to the field. The ids and the name both have to fit.
 - **Set / check.** *Set* is a command that changes the thing; *check* is a condition or a read of it; *both* is the default. A call of a common event, a picture and a transfer have neither.
 - **Look in** (under the tabs) chooses the common events, the map events and the troops.
 - A transfer by variables has no map to tell (the variables hold it when the game runs), so it is found only when the ids and the name are empty.
+
+### Script
+
+The tab Script takes an expression of C# (compiled once with Roslyn) that is true for the commands to find. It sees:
+
+| | |
+|---|---|
+| `command`, `c` | the command, a `NamedCommand` (`c` is the same, shorter; `command.Code` is its code, 117 is a call of a common event) |
+| `line` | the number of the command in its page |
+| `source` | `"CE"`, `"Map"` or `"Troop"` |
+| `location` | the place of the page, as in the column Location |
+
+The properties of a concrete command are reached by a check of the type: `command is ShowPictureCommand p && p.Picture.StartsWith("great")`. The namespaces of the library (the commands, the enums such as `OnOffState`),
+`System`, `System.Linq` and `System.Text.RegularExpressions` are imported. Examples:
+
+```csharp
+command.Code == 117
+command is CallCommonEventCommand c && c.EventId is 76 or 659
+command is ShowPictureCommand p && Regex.IsMatch(p.Picture, @"sex \d") && p.Layer == 3
+command is ControlSwitchCommand s && s.State == OnOffState.On && s.StartSwitchId <= 94 && 94 <= s.EndSwitchId
+source == "Map" && command is ControlSelfSwitchCommand ss && ss.Switch == "A" && line > 100
+```
+
+A dot after a name shows its members (the names written before it are followed by reflection: `command.`, `p.Picture.`, `OnOffState.`; a call or an indexer in the chain is not), Ctrl+Space shows the names and the types,
+Up, Down and Enter or Tab choose, Escape closes the list. Enter is a new line; **Ctrl+Enter** searches. Errors of the script are shown with their positions; a command for which the script throws is not found,
+and their number and the first error are told after the search. An empty script finds every command; the conditions of pages are not commands and are not checked by it. The script runs with the rights of the program: it is your own code.
 
 ## The result
 
