@@ -67,6 +67,7 @@ public partial class MainWindow : Window
         _view.Filter = row => Matches((SearchHit)row);
         ResultsGrid.ItemsSource = _view;
         ResultsGrid.Loaded += (_, _) => MarkFilterButtons();
+        ResultsGrid.ContextMenuOpening += (_, _) => CompareItem.IsEnabled = !_busy && SelectedPages().Count == 2;
 
         BuildTabs();
         ApplySettings();
@@ -681,6 +682,67 @@ public partial class MainWindow : Window
         Walk(ResultsGrid);
     }
 
+    // ---- the diff of two pages ----
+
+    // the pages of the selected rows, in the order of the table (the upper one is the old, the left side of the diff); two rows of a page are the page once
+    private List<SearchHit> SelectedPages()
+    {
+        var selected = ResultsGrid.SelectedItems.Cast<SearchHit>().ToHashSet();
+        return _view.Cast<SearchHit>().Where(selected.Contains).DistinctBy(hit => hit.Page.Key).ToList();
+    }
+
+    private async void Compare_Click(object sender, RoutedEventArgs e)
+    {
+        var pages = SelectedPages();
+        if (_storage == null || _busy)
+            return;
+
+        if (pages.Count != 2)
+        {
+            MessageBox.Show(this, "Select the rows of two different pages (Ctrl or Shift), then Compare.", "Compare", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        CollectSettings();
+        var storage = _storage;
+        SetBusy(true, "Comparing...");
+        try
+        {
+            var (left, right) = (pages[0], pages[1]);
+            var path = await Task.Run(async () =>
+            {
+                var old = await DumpService.TextOfAsync(storage, left.Page, _settings);
+                var current = await DumpService.TextOfAsync(storage, right.Page, _settings);
+                if (old.SequenceEqual(current))
+                    return null;
+
+                var file = DumpService.DiffFileOf(_settings, _loadedPath, left.Page, right.Page);
+                Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+                await File.WriteAllTextAsync(file, DiffHtml.Build(old, current, left.Location, right.Location));
+                return file;
+            });
+
+            if (path == null)
+            {
+                SetStatus("The commands of the two pages are the same.");
+                MessageBox.Show(this, "The commands of the two pages are the same.", "Compare", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            DumpService.Open(path, []);
+            SetStatus("Diff opened.");
+        }
+        catch (Exception ex)
+        {
+            SetStatus("The comparison failed.");
+            MessageBox.Show(this, ex.ToString(), "Compare", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
     // ---- the dump ----
 
     private void DumpBrowse_Click(object sender, RoutedEventArgs e)
@@ -705,7 +767,8 @@ public partial class MainWindow : Window
     {
         // a dump is made for a page, so the rows of the same page are one dump; the rows that the filter hides are not opened
         var rows = _view.Cast<SearchHit>().ToList();
-        var targets = rows.Select(hit => hit.Page).DistinctBy(page => page.Key).Select(page => new DumpTarget(page, LinesOf(rows, page, null))).ToList();
+        // (the lines of a page go in the order of the page, not of the table, so the dump opens at its topmost match whatever the table is sorted by)
+        var targets = rows.Select(hit => hit.Page).DistinctBy(page => page.Key).Select(page => new DumpTarget(page, LinesOf(rows, page, null).Order().ToList())).ToList();
         await OpenDumps(targets, 10, count => $"The result has {count} different pages: write and open a dump for each of them in the browser?");
     }
 

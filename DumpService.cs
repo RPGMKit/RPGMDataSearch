@@ -25,7 +25,32 @@ internal static class DumpService
             ExpandCommonEvents = settings.ExpandCommonEvents,
         };
 
-        var folder = FolderOf(settings.DumpFolder, projectPath);
+        return await Write(Path.Combine(FolderOf(settings.DumpFolder, projectPath), FileOf(page, "html")), writer => Dump(storage, page, options, writer));
+    }
+
+    /// <summary>The commands of the page as the text dump writes them (the lines after "Commands:"; the header of the page is not a part of them).</summary>
+    public static async Task<List<string>> TextOfAsync(Storage storage, PageRef page, AppSettings settings)
+    {
+        var writer = new StringWriter();
+        await Dump(storage, page, new DumpOptions { Format = DumpFormat.Text, ExtendedFormat = settings.ExtendedFormat }, writer);
+        var lines = writer.ToString().ReplaceLineEndings("\n").Split('\n').ToList();
+        var commands = lines.Skip(lines.IndexOf("Commands:") + 1).ToList();
+        if (commands.Count > 0 && commands[^1].Length == 0)
+            commands.RemoveAt(commands.Count - 1);   // (the newline that ends the last line)
+
+        return commands;
+    }
+
+    /// <summary>The path of the dump of the page in the folder of the project's dumps: CE/CE001.html, ME/M001_E002_P0.html, TE/T001_P0.html.</summary>
+    public static string FileOf(PageRef page, string extension) => page.Source switch
+    {
+        SourceKind.CommonEvent => Path.Combine("CE", $"CE{page.CommonEventId:D3}.{extension}"),
+        SourceKind.MapEvent => Path.Combine("ME", $"M{page.MapId:D3}_E{page.EventId:D3}_P{page.PageIndex}.{extension}"),
+        _ => Path.Combine("TE", $"T{page.TroopId:D3}_P{page.PageIndex}.{extension}"),
+    };
+
+    private static async Task Dump(Storage storage, PageRef page, DumpOptions options, TextWriter writer)
+    {
         switch (page.Source)
         {
             case SourceKind.CommonEvent:
@@ -33,7 +58,8 @@ internal static class DumpService
                 var commonEvent = storage.CommonEvents.Get(page.CommonEventId) ?? throw new InvalidOperationException($"There is no common event {page.CommonEventId}");
                 IndentHelper.ValidateIndents(commonEvent, storage.Version);
                 var context = new EntityContext(storage, new CommonEventContext { CommonEvent = commonEvent }, options.ExtendedFormat);
-                return await Write(Path.Combine(folder, "CE", $"CE{page.CommonEventId:D3}.html"), writer => commonEvent.Dump(writer, context, options));
+                await commonEvent.Dump(writer, context, options);
+                break;
             }
             case SourceKind.MapEvent:
             {
@@ -42,7 +68,8 @@ internal static class DumpService
                 var eventPage = ev.Pages[page.PageIndex] ?? throw new InvalidOperationException("There is no such page");
                 IndentHelper.ValidateIndents(eventPage, storage.Version);
                 var context = new EntityContext(storage, new MapEventContext { MapId = page.MapId, Map = map, Event = ev, PageId = page.PageIndex, EventPage = eventPage }, options.ExtendedFormat);
-                return await Write(Path.Combine(folder, "ME", $"M{page.MapId:D3}_E{page.EventId:D3}_P{page.PageIndex}.html"), writer => eventPage.Dump(writer, context, options));
+                await eventPage.Dump(writer, context, options);
+                break;
             }
             default:
             {
@@ -50,7 +77,8 @@ internal static class DumpService
                 var troopPage = troop.Pages[page.PageIndex] ?? throw new InvalidOperationException("There is no such page");
                 IndentHelper.ValidateIndents(troopPage, storage.Version);
                 var context = new EntityContext(storage, new TroopContext { Troop = troop, PageId = page.PageIndex, EventPage = troopPage }, options.ExtendedFormat);
-                return await Write(Path.Combine(folder, "TE", $"T{page.TroopId:D3}_P{page.PageIndex}.html"), writer => troopPage.Dump(writer, context, options));
+                await troopPage.Dump(writer, context, options);
+                break;
             }
         }
     }
@@ -74,6 +102,10 @@ internal static class DumpService
 
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(target) { UseShellExecute = true });
     }
+
+    /// <summary>The path of the html of the diff of two pages: <c>diff/CE553__M001_E002_P0.html</c> in the folder of the project's dumps.</summary>
+    public static string DiffFileOf(AppSettings settings, string projectPath, PageRef left, PageRef right) =>
+        Path.Combine(FolderOf(settings.DumpFolder, projectPath), "diff", Path.GetFileNameWithoutExtension(FileOf(left, "html")) + "__" + Path.GetFileNameWithoutExtension(FileOf(right, "html")) + ".html");
 
     /// <summary>Every page of the map event of the page.</summary>
     public static IEnumerable<PageRef> PagesOfEvent(Storage storage, PageRef page)

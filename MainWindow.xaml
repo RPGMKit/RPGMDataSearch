@@ -78,7 +78,7 @@
         </DockPanel>
 
         <!-- the result -->
-        <DataGrid Grid.Row="3" x:Name="ResultsGrid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single"
+        <DataGrid Grid.Row="3" x:Name="ResultsGrid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Extended"
                   CanUserAddRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal" AlternatingRowBackground="#10808080"
                   MouseDoubleClick="ResultsGrid_MouseDoubleClick" SelectionChanged="ResultsGrid_SelectionChanged">
             <DataGrid.Columns>
@@ -97,6 +97,7 @@
                 <ContextMenu>
                     <MenuItem Header="Open the page dump" Click="OpenPage_Click" />
                     <MenuItem Header="Open dumps of all pages of the event" Click="OpenEvent_Click" />
+                    <MenuItem x:Name="CompareItem" Header="Compare the two selected pages (diff)" Click="Compare_Click" />
                     <Separator />
                     <MenuItem Header="Copy the location" Click="CopyLocation_Click" />
                     <MenuItem Header="Copy the details" Click="CopyDetails_Click" />

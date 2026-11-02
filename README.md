@@ -108,8 +108,18 @@ A double click on a row, **Open the page dump** or the context menu writes the h
 - **Expand common events** puts the called common events under their calls; **Extended format** is the extended names.
 - **Dump to** is the folder of the dumps, `temp` next to the program by default. A project has a folder of its own in it, named by the hash of the path of the project: `<Dump to>/<hash>/CE|ME|TE/`.
 
-The lines of the hits on the page are marked in the dump and the page is opened at the first of them: the line of the chosen row, or the first of the shown rows for "all results". A condition of a page has no line and marks nothing.
+The lines of the hits on the page are marked in the dump and the page is opened at the first of them: the line of the chosen row, or the topmost matching line of the page for "all results" (the lines go in the order of the page, whatever the table is sorted by). A condition of a page has no line and marks nothing.
 The dump is opened by the address `page.html#lines=12,40`; the shell takes a path to open (a `#` would be a part of the name), so a little page `*.marked.html` next to the dump leads there.
+
+## Compare two pages
+
+Select the rows of two different pages in the table (Ctrl or Shift; the rows of one page count as one), then the context menu **Compare the two selected pages (diff)**. The upper page of the table is the old side.
+The two text dumps of the commands (the same text as the text dump of the library, with the extended names if "Extended format" is on; the header of the page is not compared) are compared by lines, and the diff is opened in the browser
+(`<Dump to>/<hash>/diff/<old>__<new>.html`). When the commands are the same, the program says so and writes nothing.
+
+The page is a diff as `git diff` shows it: the lines of the changes with three lines of context, the headers `@@ -12,5 +12,6 @@`, red and green lines, and the words that differ marked inside the changed lines.
+**Swap sides** turns the diff over (the left page becomes the right one and what was removed becomes added; the page does it itself, nothing is compared again), the buttons **Unified** and **Side by side** switch the view without reloading, **Show all lines** shows the unchanged lines between the pieces too; the browser remembers the choice. The diff is made with
+[DiffPlex](https://github.com/mmanela/diffplex).
 
 ## Settings
 
@@ -127,7 +137,8 @@ Everything is kept in `settings.json` next to the program. It is read at the sta
 | `MainWindow.xaml(.cs)` | the window: the tabs, the result and its filters, the dump |
 | `SearchEngine.cs` | walks the common events, the pages of the map events and of the troops; what a command refers to |
 | `SearchModel.cs`, `IdFilter.cs` | the request, the hit, the ids and ranges |
-| `DumpService.cs` | the html dump of a page with the library, the folder of a project, opening it with the marked lines |
+| `DumpService.cs` | the html and the text dump of a page with the library, the folder of a project, opening it with the marked lines |
+| `DiffHtml.cs` | the html of the diff of two texts (DiffPlex): unified and side by side |
 | `ProjectLoader.cs` | MV or VX Ace by the folder |
 | `AppSettings.cs` | `settings.json` |
 | `external/RPGMDataKit` | the library (submodule) |
